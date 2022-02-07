@@ -65,7 +65,7 @@ func init() {
 }
 
 func NewsHandler(w http.ResponseWriter, r *http.Request) {
-	p := NewsAggPage{Title: "GOLANG", News: newsMap}
+	p := NewsAggPage{Title: "News agrregator", News: newsMap}
 	directory, _ := os.Getwd()
 	t, _ := template.ParseFiles(path.Join(directory, "server", "templates", "news.html"))
 	t.Execute(w, p)
