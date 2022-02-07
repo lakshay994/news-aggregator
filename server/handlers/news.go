@@ -8,8 +8,10 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 )
 
+var wg sync.WaitGroup
 var wpSitemap = `
 <sitemapindex>
 <sitemap>
@@ -46,20 +48,34 @@ type NewsAggPage struct {
 	News  map[string]NewsMap
 }
 
+func fetchNews(c chan *News, location string) {
+	defer wg.Done()
+
+	n := &News{}
+	location = strings.TrimSpace(location)
+	resp, _ := http.Get(location)
+	bytes, _ := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	xml.Unmarshal(bytes, &n)
+
+	c <- n
+}
+
 func init() {
 	s := &SitemapIndex{}
-	n := &News{}
+	queue := make(chan *News, 50)
 	xml.Unmarshal([]byte(wpSitemap), &s)
 
 	for _, Location := range s.Locations {
-		Location = strings.TrimSpace(Location)
-		resp, _ := http.Get(Location)
-		bytes, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		xml.Unmarshal(bytes, &n)
+		wg.Add(1)
+		fetchNews(queue, Location)
+	}
+	wg.Wait()
+	close(queue)
 
-		for i := range n.Keywords {
-			newsMap[n.Titles[i]] = NewsMap{Keyword: n.Keywords[i], Location: n.Locations[i]}
+	for news := range queue {
+		for i := range news.Keywords {
+			newsMap[news.Titles[i]] = NewsMap{Keyword: news.Keywords[i], Location: news.Locations[i]}
 		}
 	}
 }
